@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Loma · Tell us what to build</title>
+<meta name="description" content="Six questions about the experiences you actually want. Two minutes, and it decides what we build next.">
+<meta property="og:title" content="Loma · Tell us what to build">
+<meta property="og:description" content="Six questions. Two minutes. It decides what we build next.">
+<meta property="og:image" content="img/monaco-balcony.jpg">
+<meta name="theme-color" content="#1c1713">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+ * The founding-member survey.
+ *
+ * One file, no build, no server. It writes straight to Supabase with the
+ * publishable key, which is the same key the app ships in its own client
+ * bundle, so there is nothing secret here and nothing to deploy. That is
+ * deliberate: the link has to outlive every machine any of us owns.
+ */
+:root{
+  --bg:#1c1713;
+  --fg:#f6f0e9;
+  --muted:#a89d92;
+  --primary:#e8744a;
+  --gold:#e6c88a;
+  --line:rgba(255,255,255,.15);
+  --display:"Fraunces",Georgia,serif;
+  --body:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--fg);font-family:var(--body);
+  overflow:hidden;
+}
+#app{
+  position:relative;height:100dvh;width:100%;max-width:520px;margin:0 auto;
+  overflow:hidden;
+}
+
+/* The photograph, drifting, under enough shade that white type reads on it. */
+#bg,#bg2{position:absolute;inset:0;background-size:cover;background-position:center;
+  transition:opacity .9s ease;will-change:transform}
+#bg2{opacity:0}
+.drift{animation:drift 18s linear forwards}
+@keyframes drift{from{transform:scale(1.14)}to{transform:scale(1)}}
+#shade{position:absolute;inset:0;transition:background .7s ease;
+  background:linear-gradient(to top,var(--bg) 0%,rgba(28,23,19,.82) 45%,rgba(28,23,19,.45) 100%)}
+#shade.dim{background:rgba(28,23,19,.72)}
+
+#bar{position:absolute;top:0;left:0;right:0;height:3px;background:rgba(255,255,255,.1);z-index:30;opacity:0;transition:opacity .4s}
+#bar>i{display:block;height:100%;width:0;background:var(--primary);
+  transition:width .6s cubic-bezier(.16,1,.3,1)}
+#top{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;
+  justify-content:space-between;padding:20px;opacity:0;transition:opacity .4s;pointer-events:none}
+#top.on,#bar.on{opacity:1}
+#top.on{pointer-events:auto}
+.mark{display:flex;align-items:center;gap:8px}
+.mark svg{width:28px}
+.mark span{font-family:var(--display);font-size:15px;letter-spacing:.2em}
+#mute{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);
+  background:rgba(0,0,0,.3);color:var(--muted);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;backdrop-filter:blur(8px)}
+
+#stage{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;
+  justify-content:flex-end;padding:96px 24px 40px;overflow-y:auto;overscroll-behavior:contain}
+.screen{display:flex;flex-direction:column;justify-content:flex-end;flex:1;
+  animation:enter .45s cubic-bezier(.16,1,.3,1) both}
+.screen.leaving{animation:leave .3s ease forwards}
+.screen.mid{justify-content:center;align-items:center;text-align:center}
+.screen.top{justify-content:flex-start}
+@keyframes enter{from{opacity:0;transform:translateX(34px)}to{opacity:1;transform:none}}
+@keyframes leave{to{opacity:0;transform:translateX(-34px)}}
+
+.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
+h1{font-family:var(--display);font-size:30px;line-height:1.12;font-weight:600;margin-top:8px}
+.sub{font-size:15px;line-height:1.55;color:var(--muted);margin-top:12px}
+
+input[type=text],input[type=email]{
+  width:100%;margin-top:28px;padding-bottom:12px;background:none;border:0;
+  border-bottom:1px solid var(--line);color:var(--fg);font-family:var(--display);
+  font-size:26px;outline:none}
+input::placeholder{color:rgba(168,157,146,.45)}
+input:focus{border-color:var(--primary)}
+textarea{width:100%;margin-top:20px;padding:14px 16px;border-radius:16px;
+  border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--fg);
+  font-family:var(--body);font-size:16px;line-height:1.5;resize:none;outline:none;
+  backdrop-filter:blur(8px)}
+textarea:focus{border-color:var(--primary)}
+
+.cta{margin-top:32px;display:flex;align-items:center;justify-content:center;gap:8px;
+  border:0;border-radius:999px;background:var(--primary);color:#2a1a12;
+  font-family:var(--body);font-size:16px;font-weight:500;padding:16px 24px;cursor:pointer;
+  transition:opacity .2s,transform .12s}
+.cta:active{transform:scale(.97)}
+.cta[disabled]{opacity:.35;cursor:default}
+.ghost{margin-top:16px;align-self:center;background:none;border:0;color:var(--muted);
+  font-family:var(--body);font-size:14px;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+
+.choices{margin-top:28px;display:flex;flex-direction:column;gap:10px}
+.choice{display:flex;align-items:center;justify-content:space-between;
+  border:1px solid var(--line);border-radius:16px;background:rgba(0,0,0,.3);
+  color:var(--fg);font-family:var(--body);font-size:16px;text-align:left;
+  padding:16px 20px;cursor:pointer;backdrop-filter:blur(8px);
+  animation:rise .45s cubic-bezier(.16,1,.3,1) both;transition:border-color .2s,background .2s}
+.choice:active{transform:scale(.985)}
+.choice.on{border-color:var(--primary);background:rgba(232,116,74,.15)}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+.cards{margin-top:20px;display:flex;flex-direction:column;gap:12px}
+.card{border:1px solid rgba(255,255,255,.12);border-radius:16px;background:rgba(0,0,0,.4);
+  overflow:hidden;backdrop-filter:blur(8px);animation:rise .5s cubic-bezier(.16,1,.3,1) both}
+.card .pic{position:relative;height:108px}
+.card .pic img{width:100%;height:100%;object-fit:cover;display:block}
+.card .pic::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(to top,rgba(0,0,0,.85),rgba(0,0,0,.1))}
+.card .pic b{position:absolute;left:16px;bottom:10px;z-index:2;font-family:var(--display);
+  font-size:21px;font-weight:600;color:#fff}
+.card p{padding:12px 16px 0;font-size:13.5px;line-height:1.4;color:var(--muted)}
+.rate{display:flex;gap:8px;padding:14px 16px}
+.rate button{flex:1;height:36px;border-radius:8px;border:1px solid var(--line);
+  background:none;color:var(--muted);font-family:var(--body);font-size:13px;cursor:pointer;
+  transition:background .18s,color .18s,border-color .18s}
+.rate button.on{background:var(--primary);border-color:var(--primary);color:#2a1a12}
+.rate button:active{transform:scale(.9)}
+
+/* The logo, in the order the identity guidelines describe it. */
+.logo{display:flex;flex-direction:column;align-items:center}
+.logo svg{width:164px;overflow:visible}
+.arc{stroke:var(--primary);stroke-width:5;stroke-linecap:round;fill:none;
+  stroke-dasharray:260;stroke-dashoffset:260;animation:draw 1.25s cubic-bezier(.22,.9,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.word{display:flex;align-items:baseline;margin-top:-8px}
+.word span{font-family:var(--display);font-size:46px;font-weight:600;line-height:1;
+  letter-spacing:.2em;opacity:0;animation:letter .75s cubic-bezier(.16,1,.3,1) forwards}
+.word span.o{transform:translateY(-.035em)}
+@keyframes letter{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+.word span.o{animation-name:letterO}
+@keyframes letterO{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(-.035em)}}
+.rule{height:1px;background:rgba(246,240,233,.35);width:0;margin-top:16px;
+  animation:rule .7s cubic-bezier(.22,.9,.2,1) 1.05s forwards}
+@keyframes rule{to{width:172px}}
+.tag{margin-top:12px;font-size:11px;letter-spacing:.42em;text-transform:uppercase;
+  color:var(--muted);opacity:0;animation:fade .8s 1.35s forwards}
+@keyframes fade{to{opacity:1}}
+
+#gate{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;background:none;border:0;
+  color:var(--fg);cursor:pointer;width:100%;font-family:var(--body);transition:opacity .25s}
+#gate.gone{opacity:0;pointer-events:none}
+#gate .ring{width:96px;height:96px;border-radius:50%;border:1px solid rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;animation:pulse 2.4s ease-in-out infinite}
+#gate .ring svg{width:44px}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.65}50%{transform:scale(1.07);opacity:1}}
+#gate h2{font-family:var(--display);font-size:26px;font-weight:600;margin-top:36px}
+#gate small{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--muted)}
+
+.note{margin-top:24px;font-size:12px;color:rgba(168,157,146,.7);max-width:300px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bg"></div>
+  <div id="bg2"></div>
+  <div id="shade" class="dim"></div>
+
+  <div id="bar"><i></i></div>
+  <div id="top">
+    <div class="mark">
+      <svg viewBox="0 0 200 74" fill="none" aria-hidden="true"><path d="M8 62 C 52 6, 148 6, 192 62" stroke="#e8744a" stroke-width="7" stroke-linecap="round"/></svg>
+      <span>LOMA</span>
+    </div>
+    <button id="mute" aria-label="Turn sound off">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+    </button>
+  </div>
+
+  <div id="stage"></div>
+
+  <button id="gate">
+    <span class="ring">
+      <svg viewBox="0 0 200 74" fill="none" aria-hidden="true"><path d="M8 62 C 52 6, 148 6, 192 62" stroke="#e8744a" stroke-width="7" stroke-linecap="round"/></svg>
+    </span>
+    <h2>Tap to begin</h2>
+    <small>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      Sound on, if you can
+    </small>
+  </button>
+</div>
+
+<script>
+/* ---------------------------------------------------------------- config */
+var SUPABASE_URL = "https://zogpesrebsxcnthgojga.supabase.co";
+/* The publishable key. It is in the app's own client bundle already and is
+   designed to be public; row level security is what actually guards the table. */
+var SUPABASE_KEY = "sb_publishable_0qeJrUhN0QSlGnW5AkP2AQ_lESnjp0m";
+var MVP_URL = "https://loma-app-essb6jg7ya-uc.a.run.app/";
+
+/* ----------------------------------------------------------------- sound
+ * Synthesised rather than loaded. The opening has to be exact (chime at zero,
+ * logo one second in), and built here that timing is a number instead of a
+ * download. Every browser blocks sound until a tap, which is why the survey
+ * opens on one. */
+var ctx = null, muted = false;
+function audio(){
+  if(!ctx){
+    var C = window.AudioContext || window.webkitAudioContext;
+    if(!C) return null;
+    try{ ctx = new C(); }catch(e){ return null; }
+  }
+  if(ctx.state === "suspended") ctx.resume();
+  return ctx;
+}
+function bell(c,at,hz,gain,len){
+  var out=c.createGain();
+  out.gain.setValueAtTime(0,at);
+  out.gain.linearRampToValueAtTime(gain,at+0.012);
+  out.gain.exponentialRampToValueAtTime(0.0001,at+len);
+  out.connect(c.destination);
+  [[1,1],[2.01,.3],[3,.12]].forEach(function(p){
+    var o=c.createOscillator(); o.type="sine"; o.frequency.value=hz*p[0];
+    var g=c.createGain(); g.gain.value=p[1];
+    o.connect(g); g.connect(out); o.start(at); o.stop(at+len+0.05);
+  });
+}
+function openingChime(){
+  var c=audio(); if(!c||muted) return;
+  var t=c.currentTime+0.02;
+  var pad=c.createGain();
+  pad.gain.setValueAtTime(0,t);
+  pad.gain.linearRampToValueAtTime(.16,t+1.5);
+  pad.gain.linearRampToValueAtTime(.1,t+2.6);
+  pad.gain.exponentialRampToValueAtTime(.0001,t+4.4);
+  var f=c.createBiquadFilter(); f.type="lowpass"; f.Q.value=.9;
+  f.frequency.setValueAtTime(220,t);
+  f.frequency.exponentialRampToValueAtTime(2200,t+2.2);
+  pad.connect(f); f.connect(c.destination);
+  [110,110.4,164.81].forEach(function(hz){
+    var o=c.createOscillator(); o.type="triangle"; o.frequency.value=hz;
+    o.connect(pad); o.start(t); o.stop(t+4.6);
+  });
+  bell(c,t,220,.2,2.6); bell(c,t+.45,329.63,.18,2.4);
+  bell(c,t+1,440,.22,3); bell(c,t+1.7,659.25,.13,3.2);
+}
+function tick(){
+  var c=audio(); if(!c||muted) return;
+  var t=c.currentTime+0.01, g=c.createGain();
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(.09,t+.008);
+  g.gain.exponentialRampToValueAtTime(.0001,t+.16);
+  g.connect(c.destination);
+  var o=c.createOscillator(); o.type="sine";
+  o.frequency.setValueAtTime(760,t);
+  o.frequency.exponentialRampToValueAtTime(1180,t+.07);
+  o.connect(g); o.start(t); o.stop(t+.2);
+}
+function stepSound(){
+  var c=audio(); if(!c||muted) return;
+  var t=c.currentTime+0.01;
+  bell(c,t,523.25,.1,.5); bell(c,t+.06,784,.07,.6);
+}
+function closingChord(){
+  var c=audio(); if(!c||muted) return;
+  var t=c.currentTime+0.02;
+  bell(c,t,261.63,.16,3.4); bell(c,t+.1,392,.14,3.2);
+  bell(c,t+.2,523.25,.12,3.6); bell(c,t+.6,784,.08,3);
+}
+
+/* ------------------------------------------------------------------ data */
+var NICHES=[
+  {key:"luxury_travel",title:"High-end travel",
+   blurb:"Five star and past it. Private jets, yachts, the suite with the view.",
+   img:"img/hvar-island-yacht.jpg"},
+  {key:"adventure",title:"Adventure",
+   blurb:"The Mongol Rally across the plains, Machu Picchu on foot, the Atlas on a motorcycle, surf camp, a dive trip.",
+   img:"img/atlas-berber-trek.jpg"},
+  {key:"wellness",title:"Wellness and health",
+   blurb:"A Wim Hof retreat, breathwork, training with Shaolin monks, tai chi with a master, energy work, a silent retreat.",
+   img:"img/iceland-lagoon.jpg"}
+];
+var SPEND=["Under $10k","$10k – $25k","$25k – $50k","$50k – $100k","$100k – $250k","$250k and up"];
+var TRIPS=["1 or 2","3 or 4","5 to 8","9 to 12","More than 12"];
+var ASKED=["name","email","mvp","catalogue","niches","spend","trips"];
+var BACKDROP={
+  gate:"img/monaco-balcony.jpg", logo:"img/monaco-balcony.jpg",
+  name:"img/amalfi-cliff-suite.jpg", email:"img/mykonos-cave-suite.jpg",
+  mvp:"img/formentera-sunset.jpg", catalogue:"img/tokyo-sushi-counter.jpg",
+  niches:"img/verbier-heliski.jpg", spend:"img/london-nice-jet.jpg",
+  trips:"img/iceland-glass-lodge.jpg", done:"img/hvar-island-yacht.jpg"
+};
+
+var answers={name:"",email:"",triedMvp:false,catalogueIdeas:"",niches:{},annualSpend:"",tripsPerYear:""};
+var startedAt=Date.now();
+var stage="gate";
+
+/* ------------------------------------------------------------------- dom */
+var $stage=document.getElementById("stage");
+var $bar=document.getElementById("bar"), $barFill=$bar.firstElementChild;
+var $top=document.getElementById("top"), $gate=document.getElementById("gate");
+var $bg=document.getElementById("bg"), $bg2=document.getElementById("bg2");
+var $shade=document.getElementById("shade");
+var front=true;
+
+function setBackdrop(src,dim){
+  var show = front ? $bg2 : $bg, hide = front ? $bg : $bg2;
+  show.style.backgroundImage='url("'+src+'")';
+  show.classList.remove("drift"); void show.offsetWidth; show.classList.add("drift");
+  show.style.opacity=1; hide.style.opacity=0;
+  front=!front;
+  $shade.classList.toggle("dim",!!dim);
+}
+function el(html){var d=document.createElement("div");d.innerHTML=html.trim();return d.firstElementChild;}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+
+function logoHtml(){
+  return '<div class="logo">'+
+    '<svg viewBox="0 0 200 74" fill="none" aria-hidden="true"><path class="arc" d="M8 62 C 52 6, 148 6, 192 62"/></svg>'+
+    '<div class="word" aria-label="Loma">'+
+      '<span style="animation-delay:.5s">L</span>'+
+      '<span class="o" style="animation-delay:.6s">O</span>'+
+      '<span style="animation-delay:.7s">M</span>'+
+      '<span style="animation-delay:.8s">A</span>'+
+    '</div>'+
+    '<div class="rule"></div><div class="tag">See further</div></div>';
+}
+function ask(small,big){
+  return '<div><p class="eyebrow">'+esc(small)+'</p><h1>'+esc(big)+'</h1></div>';
+}
+
+function show(next){
+  var old=$stage.firstElementChild;
+  if(old){ old.classList.add("leaving"); setTimeout(function(){ if(old.parentNode) old.parentNode.removeChild(old); },300); }
+  stage=next;
+  setBackdrop(BACKDROP[next], next==="gate"||next==="logo");
+  var header = next!=="gate" && next!=="logo" && next!=="done";
+  $top.classList.toggle("on",header); $bar.classList.toggle("on",header);
+  var at=ASKED.indexOf(next);
+  $barFill.style.width = (next==="done" ? 100 : (at<0?0:Math.round(at/ASKED.length*100)))+"%";
+  var node=build(next);
+  $stage.appendChild(node);
+  var focus=node.querySelector("input");
+  if(focus) setTimeout(function(){focus.focus();},420);
+  $stage.scrollTop=0;
+}
+function go(next){ stepSound(); show(next); }
+
+/* --------------------------------------------------------------- screens */
+function build(s){
+  if(s==="logo"){
+    var n=el('<div class="screen mid">'+logoHtml()+
+      '<button class="cta" style="margin-top:56px;background:none;border:1px solid rgba(255,255,255,.25);color:var(--fg);opacity:0;animation:fade .7s 2.4s forwards">Begin →</button></div>');
+    n.querySelector("button").onclick=function(){go("name");};
+    return n;
+  }
+  if(s==="name"){
+    var n=el('<div class="screen">'+ask("First, so this is not anonymous","What is your name?")+
+      '<input type="text" placeholder="Your name" autocomplete="name" autocapitalize="words">'+
+      '<button class="cta" disabled>Continue →</button></div>');
+    var i=n.querySelector("input"), b=n.querySelector("button");
+    i.value=answers.name;
+    i.oninput=function(){answers.name=i.value;b.disabled=!i.value.trim();};
+    i.onkeydown=function(e){if(e.key==="Enter"&&i.value.trim())go("email");};
+    b.disabled=!answers.name.trim();
+    b.onclick=function(){go("email");};
+    return n;
+  }
+  if(s==="email"){
+    var first=(answers.name.trim().split(" ")[0]||"");
+    var n=el('<div class="screen">'+ask(first?"Good to meet you, "+first:"Good to meet you","Where do we send your invitation?")+
+      '<input type="email" placeholder="you@email.com" autocomplete="email" autocapitalize="off" spellcheck="false">'+
+      '<button class="cta" disabled>Continue →</button></div>');
+    var i=n.querySelector("input"), b=n.querySelector("button");
+    var ok=function(v){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());};
+    i.value=answers.email;
+    i.oninput=function(){answers.email=i.value;b.disabled=!ok(i.value);};
+    i.onkeydown=function(e){if(e.key==="Enter"&&ok(i.value))go("mvp");};
+    b.disabled=!ok(answers.email);
+    b.onclick=function(){go("mvp");};
+    return n;
+  }
+  if(s==="mvp"){
+    var n=el('<div class="screen">'+ask("Two minutes with it","Open Loma, then come back.")+
+      '<p class="sub">Swipe through the feed. Right on anything you would actually want, left on anything you would not. Then come back here and tell us what was missing.</p>'+
+      '<a class="cta" href="'+MVP_URL+'" target="_blank" rel="noreferrer">Open the app ↗</a>'+
+      '<button class="ghost"></button></div>');
+    var a=n.querySelector("a"), g=n.querySelector(".ghost");
+    g.textContent = answers.triedMvp ? "I am back, next question" : "Skip, I have seen it";
+    a.onclick=function(){tick();answers.triedMvp=true;g.textContent="I am back, next question";};
+    g.onclick=function(){go("catalogue");};
+    return n;
+  }
+  if(s==="catalogue"){
+    var n=el('<div class="screen">'+ask("Not the buttons. The things themselves.","What should be in the feed that is not?")+
+      '<p class="sub">A place, a trip, a night, a thing you have been meaning to do for years. Be specific and it gets built.</p>'+
+      '<textarea rows="4" placeholder="Heli-skiing in Georgia. A table at Sublimotion. Two weeks on a boat with no plan."></textarea>'+
+      '<button class="cta">Continue →</button></div>');
+    var t=n.querySelector("textarea");
+    t.value=answers.catalogueIdeas;
+    t.oninput=function(){answers.catalogueIdeas=t.value;};
+    n.querySelector("button").onclick=function(){go("niches");};
+    return n;
+  }
+  if(s==="niches"){
+    var cards=NICHES.map(function(x,i){
+      return '<div class="card" data-k="'+x.key+'" style="animation-delay:'+(i*0.07)+'s">'+
+        '<div class="pic"><img src="'+x.img+'" alt="" loading="lazy"><b>'+esc(x.title)+'</b></div>'+
+        '<p>'+esc(x.blurb)+'</p>'+
+        '<div class="rate">'+[1,2,3,4,5].map(function(v){
+          return '<button data-v="'+v+'" aria-label="'+esc(x.title)+': '+v+' of 5">'+v+'</button>';
+        }).join("")+'</div></div>';
+    }).join("");
+    var n=el('<div class="screen top">'+ask("Five means build it first","Rate the three.")+
+      '<div class="cards">'+cards+'</div><button class="cta" disabled>Continue →</button></div>');
+    var b=n.querySelector(".cta");
+    var sync=function(){
+      NICHES.forEach(function(x){
+        var card=n.querySelector('[data-k="'+x.key+'"]');
+        var v=answers.niches[x.key]||0;
+        Array.prototype.forEach.call(card.querySelectorAll(".rate button"),function(btn){
+          btn.classList.toggle("on", Number(btn.dataset.v)<=v);
+        });
+      });
+      b.disabled = Object.keys(answers.niches).length < NICHES.length;
+    };
+    Array.prototype.forEach.call(n.querySelectorAll(".rate button"),function(btn){
+      btn.onclick=function(){
+        tick();
+        answers.niches[btn.closest(".card").dataset.k]=Number(btn.dataset.v);
+        sync();
+      };
+    });
+    sync();
+    b.onclick=function(){go("spend");};
+    return n;
+  }
+  if(s==="spend"||s==="trips"){
+    var isSpend = s==="spend";
+    var opts = isSpend?SPEND:TRIPS;
+    var head = isSpend
+      ? ask("Rough is fine","What do you spend on travel and experiences a year?")
+      : ask("Last one","How many trips or experiences a year?");
+    var n=el('<div class="screen">'+head+'<div class="choices">'+opts.map(function(o,i){
+      return '<button class="choice" style="animation-delay:'+(0.16+i*0.055)+'s">'+esc(o)+'</button>';
+    }).join("")+'</div></div>');
+    Array.prototype.forEach.call(n.querySelectorAll(".choice"),function(btn){
+      btn.onclick=function(){
+        tick();
+        btn.classList.add("on");
+        if(isSpend){ answers.annualSpend=btn.textContent; setTimeout(function(){go("trips");},260); }
+        else { answers.tripsPerYear=btn.textContent; setTimeout(send,260); }
+      };
+    });
+    return n;
+  }
+  /* done */
+  var first=(answers.name.trim().split(" ")[0]||"");
+  return el('<div class="screen mid">'+logoHtml()+
+    '<p style="font-family:var(--display);font-size:24px;font-weight:600;margin-top:40px;opacity:0;animation:fade .7s 1.8s forwards">'+
+      (first?"Thank you, "+esc(first)+".":"Thank you.")+'</p>'+
+    '<p class="sub" style="max-width:290px;opacity:0;animation:fade .7s 2.1s forwards">That goes straight into what we build next. We will write to you when the first of it is in the feed.</p>'+
+    '<p class="note" id="saveNote"></p></div>');
+}
+
+/* -------------------------------------------------------------- the save */
+function send(){
+  closingChord();
+  show("done");
+  var payload={
+    name:answers.name.trim(), email:answers.email.trim(),
+    triedMvp:answers.triedMvp, catalogueIdeas:answers.catalogueIdeas.trim(),
+    niches:{
+      luxury_travel:answers.niches.luxury_travel||3,
+      adventure:answers.niches.adventure||3,
+      wellness:answers.niches.wellness||3
+    },
+    annualSpend:answers.annualSpend||"Not said",
+    tripsPerYear:answers.tripsPerYear||"Not said",
+    secondsTaken:Math.round((Date.now()-startedAt)/1000),
+    submittedAt:new Date().toISOString()
+  };
+  try{ localStorage.setItem("loma:survey:v1",JSON.stringify(payload)); }catch(e){}
+  fetch(SUPABASE_URL+"/rest/v1/concierge_requests",{
+    method:"POST",
+    headers:{"apikey":SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+    body:JSON.stringify({
+      member_id:memberId(), kind:"survey_v1",
+      request:"Survey — "+payload.name, status:"new", details:payload
+    })
+  }).then(function(r){
+    /* The thank-you is already on screen. A failure here is ours to fix, not
+       something to put in front of someone who has just finished answering. */
+    if(!r.ok) return r.text().then(function(t){ throw new Error(r.status+" "+t.slice(0,120)); });
+  }).catch(function(e){
+    var note=document.getElementById("saveNote");
+    if(note) note.textContent="Your answers are saved on this device but did not reach us. Send this line to the team: "+e.message;
+  });
+}
+function memberId(){
+  try{
+    var k="loma:me:id", v=localStorage.getItem(k);
+    if(!v){ v=(crypto.randomUUID?crypto.randomUUID():"anon-"+Math.random().toString(36).slice(2,12)); localStorage.setItem(k,v); }
+    return v;
+  }catch(e){ return "anon-"+Math.random().toString(36).slice(2,12); }
+}
+
+/* ------------------------------------------------------------- the start
+ * The brief, read literally: the chime starts, and one second in the logo
+ * draws itself over it. The gate fades for a quarter second, so the change is
+ * scheduled at 750ms to land the first frame on the second. */
+document.getElementById("mute").onclick=function(e){
+  e.stopPropagation();
+  muted=!muted;
+  this.style.color = muted ? "rgba(168,157,146,.4)" : "";
+  this.setAttribute("aria-label", muted?"Turn sound on":"Turn sound off");
+};
+$gate.onclick=function(){
+  openingChime();
+  $gate.classList.add("gone");
+  setTimeout(function(){ show("logo"); $gate.style.display="none"; },750);
+};
+
+/* Open any one screen on its own: ?at=niches, so a single question can go
+   round for feedback without anyone answering their way to it. */
+var at=new URLSearchParams(location.search).get("at");
+if(at && BACKDROP[at] && at!=="gate"){ $gate.style.display="none"; show(at); }
+else { setBackdrop(BACKDROP.gate,true); }
+</script>
+</body>
+</html>
